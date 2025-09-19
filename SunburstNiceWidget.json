@@ -1,0 +1,41 @@
+{
+    "name": "SunburstNiceWidget",
+    "description": "Sequences Sunburst (Observable) adapted for SAC",
+    "newInstancePrefix": "SunburstNiceWidget",
+    "eula": "",
+    "license": "",
+    "id": "SunburstNiceWidget",
+    "version": "1.0.0",
+    "supportsLinkedAnalysisFilterOnSelection": true,
+    "icon": "",
+    "vendor": "",
+    "webcomponents": [
+        {
+            "kind": "main",
+            "tag": "sunburst-nice-widget",
+            "url": "./SunburstNiceWidget.js",
+            "integrity": "",
+            "ignoreIntegrity": true
+        }
+    ],
+    "properties": {
+        "width": { "type": "integer", "default": 750 },
+        "height": { "type": "integer", "default": 700 }
+    },
+    "methods": {
+        "getDataSource": {
+            "parameters": [],
+            "body": "return this.dataBindings.getDataBinding('myDataBinding').getDataSource();",
+            "returnType": "DataSource"
+        }
+    },
+    "events": {},
+    "dataBindings": {
+        "myDataBinding": {
+            "feeds": [
+                { "id": "dimensions", "description": "Dimensions", "type": "dimension" },
+                { "id": "measures", "description": "Measures", "type": "mainStructureMember" }
+            ]
+        }
+    }
+}
