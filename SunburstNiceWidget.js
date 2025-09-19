@@ -1,4 +1,4 @@
-//v01
+//v02
 (function () {
     const tmpl = document.createElement('template');
     tmpl.innerHTML = `
@@ -67,17 +67,45 @@ svg { background-color: transparent; }
         }
 
         _transformToHierarchy(rows) {
-            // Expect SAC rows with dimensions_0 (label, id, parentId) and measures_0.raw
-            const root = { name: "root", children: [] };
-            const idToNode = new Map();
-            idToNode.set(null, root);
+            // Robust two-pass build to handle arbitrary row order and parent levels
+            const root = { name: 'root', children: [] };
+            const nodesById = new Map();
+
+            const ensureNode = (id) => {
+                if (nodesById.has(id)) return nodesById.get(id);
+                const n = { name: '', children: [] };
+                nodesById.set(id, n);
+                return n;
+            };
+
+            // First pass: create/update nodes with labels/values/raw
             for (const item of rows) {
-                if (!item.dimensions_0) continue;
-                const node = { name: item.dimensions_0.label, value: item.measures_0 ? item.measures_0.raw : 0, children: [], raw: item };
-                idToNode.set(item.dimensions_0.id, node);
-                const parent = idToNode.get(item.dimensions_0.parentId) || root;
-                parent.children.push(node);
+                if (!item || !item.dimensions_0) continue;
+                const id = item.dimensions_0.id;
+                const parentId = item.dimensions_0.parentId ?? null;
+                const label = item.dimensions_0.label || String(id);
+                const value = item.measures_0 ? item.measures_0.raw : 0;
+
+                const node = ensureNode(id);
+                node.name = label;
+                node.raw = item;
+                // assign value only for leaves; partition().sum will roll up
+                node.value = value;
+
+                // ensure parent placeholder exists
+                ensureNode(parentId);
             }
+
+            // Second pass: link children to parents (avoid duplicates)
+            for (const item of rows) {
+                if (!item || !item.dimensions_0) continue;
+                const id = item.dimensions_0.id;
+                const parentId = item.dimensions_0.parentId ?? null;
+                const node = nodesById.get(id);
+                const parent = parentId === null ? root : nodesById.get(parentId) || root;
+                if (!parent.children.includes(node)) parent.children.push(node);
+            }
+
             return root;
         }
 
