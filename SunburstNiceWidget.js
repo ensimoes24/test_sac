@@ -130,8 +130,7 @@ svg { background-color: transparent; }
 
             const root = this._partition(data, radius, d3);
 
-            // Color: stable one-color-per-dimension using raw id when available,
-            // computed from the full set of keys so arcs and breadcrumbs match
+            // Color: stable one-color-per-path using full ancestor path as key
             const allKeys = [...new Set(root.descendants().filter(d => d.depth).map(d => this._colorKeyForNode(d)))];
             const colorMap = new Map(allKeys.map((k, i) => [k, d3.interpolateRainbow(i / Math.max(1, allKeys.length))]));
             const color = (key) => colorMap.get(String(key)) || '#888';
@@ -196,20 +195,42 @@ svg { background-color: transparent; }
 
         _renderBreadcrumb(host, sunburst, color, d3) {
             const breadcrumbHeight = 30;
+            const labelPadding = 20;
+            const tipWidth = 12;
             // Clear previous breadcrumb before drawing a new one
             d3.select(host).selectAll('*').remove();
 
-            // Compute dynamic widths per label using canvas text metrics
-            const ctx = this._measureCtx || (this._measureCtx = document.createElement('canvas').getContext('2d'));
-            ctx.font = '12px sans-serif';
-            const labels = sunburst.sequence.map(d => d.data.name);
-            const widths = labels.map(t => Math.ceil(ctx.measureText(t).width) + 40); // add more padding for long names
+            // Create SVG first, then measure text using SVG getBBox for accuracy
+            const svg = d3.select(host).append('svg')
+                .attr('height', breadcrumbHeight)
+                .style('font', '12px sans-serif')
+                .style('margin', '5px');
+
+            const g = svg.selectAll('g')
+                .data(sunburst.sequence)
+                .join('g');
+
+            const texts = g.append('text')
+                .attr('x', 0)
+                .attr('y', 15)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'start')
+                .attr('fill', 'white')
+                .text(d => d.data.name);
+
+            const widths = [];
+            texts.each(function(d, i) {
+                const w = this.getBBox().width;
+                widths[i] = Math.ceil(w) + labelPadding * 2;
+            });
+
             const positions = [];
             let acc = 0;
             for (let i = 0; i < widths.length; i++) { positions.push(acc); acc += widths[i]; }
             const totalWidth = Math.max(acc + 60, 200);
 
-            const tipWidth = 12;
+            svg.attr('viewBox', `0 0 ${totalWidth} ${breadcrumbHeight}`).attr('width', totalWidth);
+
             const polygonFor = (w, i) => {
                 const points = [
                     `0,0`, `${w},0`, `${w + tipWidth},${breadcrumbHeight / 2}`,
@@ -219,30 +240,15 @@ svg { background-color: transparent; }
                 return points.join(' ');
             };
 
-            const svg = d3.select(host).append('svg')
-                .attr('viewBox', `0 0 ${totalWidth} ${breadcrumbHeight}`)
-                .attr('width', totalWidth)
-                .attr('height', breadcrumbHeight)
-                .style('font', '12px sans-serif')
-                .style('margin', '5px');
-
-            const g = svg.selectAll('g')
-                .data(sunburst.sequence)
-                .join('g')
-                .attr('transform', (d, i) => `translate(${positions[i]}, 0)`);
-
-            g.append('polygon')
+            // Insert polygons behind text
+            g.insert('polygon', 'text')
                 .attr('points', (d, i) => polygonFor(widths[i], i))
                 .attr('fill', d => color(this._colorKeyForNode(d)))
                 .attr('stroke', 'white');
 
-            g.append('text')
-                .attr('x', (d, i) => (widths[i] + 10) / 2)
-                .attr('y', 15)
-                .attr('dy', '0.35em')
-                .attr('text-anchor', 'middle')
-                .attr('fill', 'white')
-                .text(d => d.data.name);
+            // Reposition groups and center text within each breadcrumb
+            g.attr('transform', (d, i) => `translate(${positions[i]}, 0)`);
+            texts.attr('x', (d, i) => widths[i] / 2).attr('text-anchor', 'middle');
 
             svg.append('text')
                 .text(sunburst.percentage > 0 ? sunburst.percentage + '%' : '')
@@ -267,9 +273,12 @@ svg { background-color: transparent; }
         }
 
         _colorKeyForNode(d) {
+            // Prefer SAC row id when present; otherwise derive a stable key from the full path
             const raw = d && d.data && d.data.raw;
             if (raw && raw.dimensions_0 && raw.dimensions_0.id) return raw.dimensions_0.id;
-            return d && d.data && d.data.name ? d.data.name : 'unknown';
+            const names = (d.ancestors ? d.ancestors() : []).reverse().slice(1).map(n => n.data && n.data.name ? n.data.name : '');
+            if (names.length === 0 && d && d.data && d.data.name) names.push(d.data.name);
+            return names.join('>') || 'unknown';
         }
 
         _getTopParentName(node) {
