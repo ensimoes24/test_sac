@@ -129,8 +129,8 @@ svg { background-color: transparent; }
 
             const root = this._partition(data, radius, d3);
 
-            const topLevelParents = root.children ? [...new Set(root.children.map(d => d.data.name))] : [];
-            const color = d3.scaleOrdinal().domain(topLevelParents).range(d3.schemeCategory10);
+            // Color: stable one-color-per-name using hash-based HSL mapping
+            const color = (name) => this._colorForName(name);
 
             const arc = d3.arc()
                 .startAngle(d => d.x0)
@@ -161,7 +161,7 @@ svg { background-color: transparent; }
                 .data(pathData)
                 .join('path')
                 .attr('class', 'sunburst-arc')
-                .attr('fill', d => color(this._getTopParentName(d)))
+                .attr('fill', d => color(d.data.name))
                 .attr('d', arc)
                 .on('click', (event, d) => this._handleSegmentClick(d));
 
@@ -191,37 +191,47 @@ svg { background-color: transparent; }
         }
 
         _renderBreadcrumb(host, sunburst, color, d3) {
-            const breadcrumbWidth = 75;
             const breadcrumbHeight = 30;
             // Clear previous breadcrumb before drawing a new one
             d3.select(host).selectAll('*').remove();
+
+            // Compute dynamic widths per label using canvas text metrics
+            const ctx = this._measureCtx || (this._measureCtx = document.createElement('canvas').getContext('2d'));
+            ctx.font = '12px sans-serif';
+            const labels = sunburst.sequence.map(d => d.data.name);
+            const widths = labels.map(t => Math.ceil(ctx.measureText(t).width) + 28); // padding for arrow + text
+            const positions = [];
+            let acc = 0;
+            for (let i = 0; i < widths.length; i++) { positions.push(acc); acc += widths[i]; }
+            const totalWidth = Math.max(acc + 60, 200);
+
+            const tipWidth = 12;
+            const polygonFor = (w, i) => {
+                const points = [
+                    `0,0`, `${w},0`, `${w + tipWidth},${breadcrumbHeight / 2}`,
+                    `${w},${breadcrumbHeight}`, `0,${breadcrumbHeight}`
+                ];
+                if (i > 0) points.push(`${tipWidth},${breadcrumbHeight / 2}`);
+                return points.join(' ');
+            };
+
             const svg = d3.select(host).append('svg')
-                .attr('viewBox', `0 0 ${breadcrumbWidth * 10} ${breadcrumbHeight}`)
+                .attr('viewBox', `0 0 ${totalWidth} ${breadcrumbHeight}`)
                 .style('font', '12px sans-serif')
                 .style('margin', '5px');
 
             const g = svg.selectAll('g')
                 .data(sunburst.sequence)
                 .join('g')
-                .attr('transform', (d, i) => `translate(${i * breadcrumbWidth}, 0)`);
-
-            const breadcrumbPoints = (d, i) => {
-                const tipWidth = 10;
-                const points = [
-                    `0,0`, `${breadcrumbWidth},0`, `${breadcrumbWidth + tipWidth},${breadcrumbHeight / 2}`,
-                    `${breadcrumbWidth},${breadcrumbHeight}`, `0,${breadcrumbHeight}`
-                ];
-                if (i > 0) points.push(`${tipWidth},${breadcrumbHeight / 2}`);
-                return points.join(' ');
-            };
+                .attr('transform', (d, i) => `translate(${positions[i]}, 0)`);
 
             g.append('polygon')
-                .attr('points', breadcrumbPoints)
+                .attr('points', (d, i) => polygonFor(widths[i], i))
                 .attr('fill', d => color(d.data.name))
                 .attr('stroke', 'white');
 
             g.append('text')
-                .attr('x', (breadcrumbWidth + 10) / 2)
+                .attr('x', (d, i) => (widths[i] + 10) / 2)
                 .attr('y', 15)
                 .attr('dy', '0.35em')
                 .attr('text-anchor', 'middle')
@@ -230,10 +240,23 @@ svg { background-color: transparent; }
 
             svg.append('text')
                 .text(sunburst.percentage > 0 ? sunburst.percentage + '%' : '')
-                .attr('x', (sunburst.sequence.length + 0.5) * breadcrumbWidth)
+                .attr('x', acc + 30)
                 .attr('y', breadcrumbHeight / 2)
                 .attr('dy', '0.35em')
-                .attr('text-anchor', 'middle');
+                .attr('text-anchor', 'start');
+        }
+
+        _colorForName(name) {
+            if (!this._colorCache) this._colorCache = new Map();
+            if (this._colorCache.has(name)) return this._colorCache.get(name);
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+            }
+            const hue = hash % 360;
+            const color = `hsl(${hue},65%,50%)`;
+            this._colorCache.set(name, color);
+            return color;
         }
 
         _getTopParentName(node) {
