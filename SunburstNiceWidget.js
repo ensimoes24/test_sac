@@ -129,8 +129,8 @@ svg { background-color: transparent; }
 
             const root = this._partition(data, radius, d3);
 
-            // Color: stable one-color-per-name using hash-based HSL mapping
-            const color = (name) => this._colorForName(name);
+            // Color: stable one-color-per-dimension using raw id when available
+            const color = (key) => this._colorForName(String(key));
 
             const arc = d3.arc()
                 .startAngle(d => d.x0)
@@ -161,7 +161,7 @@ svg { background-color: transparent; }
                 .data(pathData)
                 .join('path')
                 .attr('class', 'sunburst-arc')
-                .attr('fill', d => color(d.data.name))
+                .attr('fill', d => color(this._colorKeyForNode(d)))
                 .attr('d', arc)
                 .on('click', (event, d) => this._handleSegmentClick(d));
 
@@ -227,7 +227,7 @@ svg { background-color: transparent; }
 
             g.append('polygon')
                 .attr('points', (d, i) => polygonFor(widths[i], i))
-                .attr('fill', d => color(d.data.name))
+                .attr('fill', d => color(this._colorKeyForNode(d)))
                 .attr('stroke', 'white');
 
             g.append('text')
@@ -257,6 +257,12 @@ svg { background-color: transparent; }
             const color = `hsl(${hue},65%,50%)`;
             this._colorCache.set(name, color);
             return color;
+        }
+
+        _colorKeyForNode(d) {
+            const raw = d && d.data && d.data.raw;
+            if (raw && raw.dimensions_0 && raw.dimensions_0.id) return raw.dimensions_0.id;
+            return d && d.data && d.data.name ? d.data.name : 'unknown';
         }
 
         _getTopParentName(node) {
