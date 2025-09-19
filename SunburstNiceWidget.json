@@ -5,7 +5,7 @@
     "eula": "",
     "license": "",
     "id": "SunburstNiceWidget",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "supportsLinkedAnalysisFilterOnSelection": true,
     "icon": "",
     "vendor": "",
@@ -13,7 +13,7 @@
         {
             "kind": "main",
             "tag": "sunburst-nice-widget",
-            "url": "./SunburstNiceWidget.js",
+            "url": "https://cdn.jsdelivr.net/gh/ensimoes24/test_sac@7bdf8dd26566f792745fa20648ef726bd67de111/SunburstNiceWidget.js",
             "integrity": "",
             "ignoreIntegrity": true
         }

@@ -203,7 +203,7 @@ svg { background-color: transparent; }
             const ctx = this._measureCtx || (this._measureCtx = document.createElement('canvas').getContext('2d'));
             ctx.font = '12px sans-serif';
             const labels = sunburst.sequence.map(d => d.data.name);
-            const widths = labels.map(t => Math.ceil(ctx.measureText(t).width) + 28); // padding for arrow + text
+            const widths = labels.map(t => Math.ceil(ctx.measureText(t).width) + 40); // add more padding for long names
             const positions = [];
             let acc = 0;
             for (let i = 0; i < widths.length; i++) { positions.push(acc); acc += widths[i]; }
@@ -221,6 +221,8 @@ svg { background-color: transparent; }
 
             const svg = d3.select(host).append('svg')
                 .attr('viewBox', `0 0 ${totalWidth} ${breadcrumbHeight}`)
+                .attr('width', totalWidth)
+                .attr('height', breadcrumbHeight)
                 .style('font', '12px sans-serif')
                 .style('margin', '5px');
 
