@@ -1,3 +1,4 @@
+//v01
 (function () {
     const tmpl = document.createElement('template');
     tmpl.innerHTML = `
@@ -129,8 +130,11 @@ svg { background-color: transparent; }
 
             const root = this._partition(data, radius, d3);
 
-            // Color: stable one-color-per-dimension using raw id when available
-            const color = (key) => this._colorForKey(String(key), d3);
+            // Color: stable one-color-per-dimension using raw id when available,
+            // computed from the full set of keys so arcs and breadcrumbs match
+            const allKeys = [...new Set(root.descendants().filter(d => d.depth).map(d => this._colorKeyForNode(d)))];
+            const colorMap = new Map(allKeys.map((k, i) => [k, d3.interpolateRainbow(i / Math.max(1, allKeys.length))]));
+            const color = (key) => colorMap.get(String(key)) || '#888';
 
             const arc = d3.arc()
                 .startAngle(d => d.x0)
