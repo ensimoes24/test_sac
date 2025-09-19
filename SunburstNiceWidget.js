@@ -130,7 +130,7 @@ svg { background-color: transparent; }
             const root = this._partition(data, radius, d3);
 
             // Color: stable one-color-per-dimension using raw id when available
-            const color = (key) => this._colorForName(String(key));
+            const color = (key) => this._colorForKey(String(key), d3);
 
             const arc = d3.arc()
                 .startAngle(d => d.x0)
@@ -246,16 +246,17 @@ svg { background-color: transparent; }
                 .attr('text-anchor', 'start');
         }
 
-        _colorForName(name) {
+        _colorForKey(key, d3) {
             if (!this._colorCache) this._colorCache = new Map();
-            if (this._colorCache.has(name)) return this._colorCache.get(name);
-            let hash = 0;
-            for (let i = 0; i < name.length; i++) {
-                hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+            if (this._colorCache.has(key)) return this._colorCache.get(key);
+            let hash = 2166136261;
+            for (let i = 0; i < key.length; i++) {
+                hash ^= key.charCodeAt(i);
+                hash = Math.imul(hash, 16777619);
             }
-            const hue = hash % 360;
-            const color = `hsl(${hue},65%,50%)`;
-            this._colorCache.set(name, color);
+            const frac = ((hash >>> 0) % 100000) / 100000; // 0..1
+            const color = d3.interpolateRainbow(frac);
+            this._colorCache.set(key, color);
             return color;
         }
 
